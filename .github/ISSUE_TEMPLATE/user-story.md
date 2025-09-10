@@ -7,14 +7,14 @@ assignees: ''
 
 ---
 
-**As a** User
-**I need** to check syntax
-**So that** I can be sure that be that my code can be read properly
+**As a** [role]
+**I need** [function]
+**So that** [benefit]
 ### Details and Assumptions
 * [document what you know]
 ### Acceptance Criteria
 ```gherkin
-Given that the syntax is incorrect
-When the tool checks the code
-Then the syntax error well be found and given a suggestion to the user
+Given [some context]
+When [certain action is taken]
+Then [the outcome of action is observed]
 ```
