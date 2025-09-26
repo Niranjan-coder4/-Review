@@ -1,0 +1,17 @@
+/*
+  Minimal styles for the upload page
+  - Keep it clean and readable with just a few rules.
+  - Button is gray and disabled by default; turns blue when a valid file is chosen.
+  - Small card layout so it feels like a tiny app without any framework.
+*/
+* { box-sizing: border-box; }
+body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; padding: 0; background: #f6f7f9; color: #222; }
+.container { max-width: 480px; margin: 48px auto; background: #fff; padding: 24px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+h1 { margin: 0 0 16px; font-size: 24px; }
+.label { display: block; margin-bottom: 8px; font-weight: 600; }
+input[type="file"] { display: block; margin-bottom: 12px; }
+button { padding: 10px 16px; font-size: 14px; border: 1px solid #ccc; border-radius: 6px; background: #eee; cursor: not-allowed; }
+button.enabled { background: #2563eb; color: white; border-color: #1e40af; cursor: pointer; }
+.message { min-height: 20px; margin-top: 12px; font-size: 14px; }
+.message.error { color: #b91c1c; }
+.message.success { color: #166534; }

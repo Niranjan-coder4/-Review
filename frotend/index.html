@@ -1,0 +1,35 @@
+<!--
+  Minimal Upload Page (student-built)
+  - Purpose: Just a super simple page to test client-side validation for code uploads.
+  - What it does: Lets you pick a file and only enables the Upload button if the
+    file looks like .py, .java, or .cpp. There’s no real backend yet—clicking Upload
+    shows a short mock message so we can see the flow.
+  - Why so basic: We’re starting small so it’s easy to test and iterate. This page
+    maps directly to the “Wrong file type” acceptance test.
+-->
+    
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Code Upload</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="container">
+    <h1>Upload Code</h1>
+
+    <form id="upload-form" novalidate>
+      <label for="file-input" class="label">Choose a file (.py, .java, .cpp)</label>
+      <input id="file-input" type="file" accept=".py,.java,.cpp">
+
+      <button id="upload-btn" type="button" disabled>Upload</button>
+
+      <p id="message" class="message" aria-live="polite"></p>
+    </form>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
