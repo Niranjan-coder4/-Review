@@ -15,3 +15,20 @@ button.enabled { background: #2563eb; color: white; border-color: #1e40af; curso
 .message { min-height: 20px; margin-top: 12px; font-size: 14px; }
 .message.error { color: #b91c1c; }
 .message.success { color: #166534; }
+
+/* Feedback Display Styles */
+.feedback-section { margin-top: 24px; padding: 16px; background: #f8f9fa; border-radius: 8px; border: 1px solid #e9ecef; }
+.feedback-section h2 { margin: 0 0 16px; font-size: 18px; color: #333; }
+.feedback-list { display: flex; flex-direction: column; gap: 12px; }
+.feedback-item { padding: 12px; border-radius: 6px; border-left: 4px solid #ccc; background: white; }
+.feedback-item.critical { border-left-color: #dc2626; background: #fef2f2; }
+.feedback-item.warning { border-left-color: #f59e0b; background: #fffbeb; }
+.feedback-item.suggestion { border-left-color: #10b981; background: #f0fdf4; }
+.feedback-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.feedback-line { font-weight: 600; color: #666; font-size: 14px; }
+.feedback-severity { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; text-transform: uppercase; }
+.feedback-severity.critical { background: #dc2626; color: white; }
+.feedback-severity.warning { background: #f59e0b; color: white; }
+.feedback-severity.suggestion { background: #10b981; color: white; }
+.feedback-message { color: #333; line-height: 1.5; }
+.feedback-category { font-size: 12px; color: #666; margin-top: 4px; font-style: italic; }

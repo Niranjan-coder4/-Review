@@ -1,5 +1,5 @@
 <!--
-  Minimal Upload Page (student-built)
+  Minimal Upload Page
   - Purpose: Just a super simple page to test client-side validation for code uploads.
   - What it does: Lets you pick a file and only enables the Upload button if the
     file looks like .py, .java, or .cpp. There’s no real backend yet—clicking Upload
@@ -7,7 +7,6 @@
   - Why so basic: We’re starting small so it’s easy to test and iterate. This page
     maps directly to the “Wrong file type” acceptance test.
 -->
-    
 <!doctype html>
 <html lang="en">
 <head>
@@ -28,6 +27,12 @@
 
       <p id="message" class="message" aria-live="polite"></p>
     </form>
+
+    <!-- Feedback Display Section -->
+    <div id="feedback-section" class="feedback-section" style="display: none;">
+      <h2>Code Review Feedback</h2>
+      <div id="feedback-list" class="feedback-list"></div>
+    </div>
   </main>
 
   <script src="script.js"></script>
