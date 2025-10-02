@@ -8,7 +8,7 @@ Simple Flask backend for code review
 import os
 import json
 import requests
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template, redirect, url_for, session
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
@@ -16,9 +16,13 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='frontend', template_folder='frontend')
 CORS(app)  # Enable CORS for all routes
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+
+
+# key for session managment
+app.secret_key = os.getenv('FLASK_SECRET_KEY', 'supersecretkey')
 
 # Configuration
 UPLOAD_FOLDER = 'uploads'
@@ -29,6 +33,10 @@ AI_API_URL = os.getenv('AI_API_URL', 'https://api-inference.huggingface.co/model
 
 # Create upload directory if it doesn't exist
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+# Simple hardcoded login credentials for demo
+VALID_USERNAME = 'admin'
+VALID_PASSWORD = '1234'
 
 def allowed_file(filename):
     """Check if file extension is allowed"""
@@ -243,6 +251,33 @@ def health_check():
         'status': 'healthy',
         'ai_configured': bool(AI_API_KEY)
     })
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        
+        if username == VALID_USERNAME and password == VALID_PASSWORD:
+            session['user'] = username
+            return redirect(url_for('upload_form'))  # Redirect after login
+        else:
+            return render_template('login.html', error='Invalid credentials')
+    
+    return render_template('login.html')
+
+@app.route('/logout')
+def logout():
+    session.pop('user', None)
+    return redirect(url_for('login'))
+
+@app.route('/upload-form')
+def upload_form():
+    if 'user' not in session:
+        return redirect(url_for('login'))
+    return render_template('upload_form.html')
+
 
 if __name__ == '__main__':
     print("Starting code review backend...")
