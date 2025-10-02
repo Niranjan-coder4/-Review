@@ -1,4 +1,4 @@
-# Sprint x Report 
+# Sprint 1 Report 
 Video Link: 
 ## What's New (User Facing)
  * Feature 1: Added API key for AI for them to review the files uploaded
@@ -65,3 +65,4 @@ Here are changes we plan to implement in the next sprint:
    * We also plan to add a feature where the Teacher and students can be viewed in the dashboard and have specific functunalities that the teacher well have.
    * Like adding students and removing them. Having the option to check the code that the student uploaded.
    * We also like to have more UI friendly design.
+
