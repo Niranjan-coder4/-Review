@@ -38,6 +38,17 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 VALID_USERNAME = 'admin'
 VALID_PASSWORD = '1234'
 
+
+@app.route('/')
+def home():
+    print("[DEBUG] / route accessed")
+    if 'user' in session:
+        print("[DEBUG] User in session, redirect to /upload_form")
+        return redirect(url_for('upload_form'))
+    print("[DEBUG] No user in session, redirect to /login")
+    return redirect(url_for('login'))
+
+
 def allowed_file(filename):
     """Check if file extension is allowed"""
     return '.' in filename and \
