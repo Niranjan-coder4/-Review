@@ -1,0 +1,97 @@
+
+Gherkin Acceptance Scenarios for LLM-Powered Code Reviewer & Debugger
+
+User Story: Upload Code
+Scenario: Valid upload
+  Given I'm logged in as an instructor
+  When I upload a .py file for the "Project 1" assignment
+  Then the system should show a "Analysis in progress..." message
+
+Scenario: Wrong file type
+  Given I'm logged in as an instructor
+  When I accidentally upload a .txt file
+  Then the system should yell at me with an error: "Please upload a supported code file (.py, .java, .cpp)"
+
+User Story: View Feedback
+Scenario: See my feedback
+  Given I'm a student and my instructor has approved my feedback
+  When I go to my "My Feedback" page
+  Then I should see my code covered in comments and a summary report
+
+Scenario: Feedback is still pending
+  Given I'm a student and I just submitted my code
+  When I nervously check the page 5 minutes later
+  Then I should see a message: "Feedback pending instructor review. Check back later."
+
+User Story: Approve/Reject Feedback
+Scenario: Instructor approves a comment
+  Given I'm an instructor reviewing AI feedback
+  When I click "Approve" on a helpful style suggestion
+  Then that comment gets tagged as approved and is cleared for the student to see
+
+Scenario: Instructor nukes a bad comment
+  Given I'm an instructor and the AI generated a nonsense comment
+  When I hit the "Reject" button
+  Then that comment gets moved to the trash and won't be in the final report
+
+User Story: Submission History
+Scenario: Looking at my history
+  Given I'm a student who has submitted Project 1 three times
+  When I view my submission history
+  Then I see a list with the dates and statuses of all three attempts
+
+Scenario: First-time user
+  Given I'm a new student who hasn't submitted anything
+  When I check my history page
+  Then I see a friendly message: "You haven't submitted any assignments yet!"
+
+User Story: Plagiarism Check
+Scenario: High similarity score
+  Given two nearly identical code submissions are uploaded
+  When the plagiarism check runs
+  Then the system should flag both with a 95% similarity score and alert the instructor
+
+Scenario: Original work
+  Given a unique, original code file is uploaded
+  When the plagiarism check runs
+  Then the report should show a very low similarity score and no flags
+
+User Story: Student Dashboard
+Scenario: Dashboard with assignments
+  Given I'm a student with two graded assignments and one pending
+  When I log in
+  Then my dashboard should show those three assignments with clear status icons
+
+Scenario: Empty dashboard
+  Given I'm a student in a new class
+  When I log in for the first time
+  Then my dashboard should be empty except for a "Welcome! No assignments yet." message
+
+User Story: Export Reports
+Scenario: Get a PDF
+  Given I'm an instructor looking at a student's detailed report
+  When I click "Export as PDF"
+  Then my browser should download a nicely formatted PDF file of the report
+
+Scenario: Export glitches
+  Given I'm an instructor trying to export a report
+  When the server times out
+  Then I should see a clear error: "Export failed. Our bad! Please try again in a moment."
+
+
+
+Deep Project Summary: LLM-Powered Code Reviewer & Debugger
+
+This project aims to create a system where instructors can upload student programming assignments in common formats (.py, .java, .cpp), and the platform will leverage an LLM (Large Language Model) to analyze the submissions. The main goal is to give meaningful, context-aware feedback in a way that supports both students and instructors.
+
+At its core, the system provides smart, in-line feedback. Instead of vague comments, issues are highlighted directly inside the student’s code with suggestions, warnings, or corrections. These are paired with a summary report that organizes issues by severity (critical, warnings, suggestions). Importantly, instructors have the final say. All AI feedback must be reviewed and either approved, edited, or rejected before students see it. This keeps the instructor in control, avoiding unfair or confusing feedback.
+
+Students benefit from a clean dashboard where they can view their assignments, feedback, and history. Submission history helps them track progress across multiple attempts, making it easier to reflect and improve over time. A plagiarism detection feature ensures academic integrity by flagging suspiciously similar submissions. Additionally, instructors can export detailed reports in PDF or CSV format for records or departmental use.
+
+From a non-functional perspective, the system prioritizes speed (feedback in under 10 seconds for typical programs), reliability (99.5% uptime), and strong security (AES-256 encryption, FERPA compliance). The system must also scale to support 200 concurrent students and remain easy to use, requiring no more than three clicks to reach key feedback.
+
+Technically, the project uses React with TypeScript for the frontend, providing reusable UI components and type safety. The backend runs on Python with Django, chosen for its strong integration with machine learning libraries and built-in security features. Docker is used for containerization, and AWS ECS handles deployment and scaling. GitHub manages version control, Jira organizes tasks, and Slack is the main communication channel. Automated testing relies on Jest (frontend) and Pytest (backend), ensuring consistent quality.
+
+The development process follows Scrum, with short sprints that allow quick testing of features like file upload, feedback generation, or plagiarism checks. This approach supports flexibility, especially since the effectiveness of LLM feedback is still uncertain and may require adjustments. Regular retrospectives and backlog updates ensure the team stays aligned and adapts as needed.
+
+Overall, the project balances innovation with practicality. By combining AI-powered analysis with instructor oversight, it creates a fair and effective system for learning. Students gain actionable, understandable feedback, instructors save time while retaining authority, and the institution benefits from academic integrity safeguards and professional reporting tools.
