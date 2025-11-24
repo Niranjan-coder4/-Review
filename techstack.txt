@@ -1,0 +1,99 @@
+Our Project Tech Stack (Explained by a Student)
+
+Why this doc exists
+I wrote this to explain, in normal student language, what we’re using to build the LLM-powered code reviewer/debugger and why we picked each piece. This isn’t marketing; it’s the stuff we actually plan to use and how it fits together.
+
+High-level overview
+- Frontend: React + TypeScript
+- Backend: Python + Django
+- AI/LLM: External LLM API (prompting + guardrails), plus internal logic
+- Plagiarism: Similarity check service (pairwise comparisons + thresholds)
+- Data & Storage: PostgreSQL (primary DB), S3-compatible object storage for uploads/exports
+- Packaging/Deploy: Docker containers, AWS ECS for orchestration
+- Testing: Jest (frontend), Pytest (backend)
+- CI/CD: GitHub (repo + Actions), versioning via conventional commits
+- Project Ops: Jira (tasks), Slack (team comms)
+- Security/Compliance: AES-256 at rest, TLS in transit, FERPA awareness, role-based access
+- Reporting/Exports: Server-side PDF/CSV generation
+
+Frontend (React + TypeScript)
+- Why React: Component model = reusable UI (upload widget, feedback diff viewer, dashboard cards). Also the ecosystem is huge.
+- Why TypeScript: Catch bugs during development and make API contracts explicit (especially helpful when dealing with structured AI feedback objects).
+- Key pieces we’ll build:
+  - File Upload Page (validates .py/.java/.cpp before hitting backend)
+  - Feedback Viewer (inline comments, severity chips: Critical/Warning/Suggestion)
+  - Instructor Review Queue (Approve/Reject/Edit AI comments)
+  - Student Dashboard (assignment list, statuses, quick links)
+  - Submission History (attempts with timestamps and outcomes)
+- State/Data:
+  - React Query (or similar) for data fetching/caching and pending states (e.g., "analysis in progress").
+  - Centralized types for API payloads so frontend/backed stay in sync.
+- Testing: Jest + React Testing Library for components and interactions (e.g., upload validation, approve button behavior).
+
+Backend (Python + Django)
+- Why Django: Batteries-included (auth, ORM, admin) and plays nicely with ML/AI libraries and Python tooling.
+- Responsibilities:
+  - AuthN/AuthZ: Roles for Student/Instructor/Admin; gates what data and actions are allowed.
+  - File intake: Validate file types, store securely, enqueue analysis.
+  - LLM Orchestration: Build prompts with context, call LLM API, apply guardrails (rate limits, timeouts, schema validation), and normalize feedback into a structured format.
+  - Feedback Review Flow: Persist AI comments, track instructor decisions (approved/rejected/edited), expose only approved to students.
+  - Plagiarism Service: Run similarity checks on relevant cohorts; store scores and flags.
+  - Reporting: Generate summary reports and server-side exports (PDF/CSV) with helpful error messaging on timeouts.
+- Data model sketch (high level):
+  - User, Assignment, Submission, FeedbackComment (fields include severity, line range, status), SimilarityReport, ExportJob.
+- Testing: Pytest for unit/integration tests; focus on validation, permission checks, and LLM response shaping.
+
+AI/LLM Integration
+- Approach: We don’t blindly trust the model; instructors remain the gate. The backend:
+  - Constructs prompts with code context and style guidelines.
+  - Validates responses against a schema (severity, message, code location). If the model goes off-spec, we retry or flag.
+  - Redacts sensitive info from prompts where applicable.
+  - Applies rate limits and generous timeouts to keep the UI snappy.
+- Latency goal: Under ~10 seconds for typical student programs. That means:
+  - Keep prompts tight.
+  - Parallelize analysis by file/section where safe.
+  - Cache results for re-views.
+
+Plagiarism / Similarity Checking
+- Method: Compute similarity across submissions (e.g., token-based or AST-guided measures). We store a score and surface high-similarity alerts to instructors.
+- UX: Clear thresholds (e.g., 95% -> strong flag). Students don’t see details until reviewed by instructors.
+- Ethics: It’s a signal, not a verdict; instructors make the final call.
+
+Storage & Data
+- Database: PostgreSQL for transactional data (users, submissions, feedback state, history).
+- Object Storage: S3-compatible bucket for uploaded code files and exported PDFs/CSVs.
+- Encryption: AES-256 at rest (DB and bucket) and TLS in transit. Secrets in environment variables or a secrets manager.
+
+Exports (PDF/CSV)
+- Server-side generation so outputs are consistent and secure (no leaking tokens to the browser).
+- Timeouts handled gracefully with user-friendly messages and retry options.
+
+Infrastructure & Deployment
+- Containers: Everything runs in Docker for consistent dev/prod parity.
+- Orchestration: AWS ECS to run and scale services. We target support for ~200 concurrent students, which is modest but needs auto-scaling.
+- CI/CD: GitHub Actions pipeline:
+  - On PR: run lint/tests for frontend/backend.
+  - On main: build images, run migrations, deploy to ECS.
+- Observability: Basic logs + metrics (request latency, queue times, error rates). Alerting for export/LLM error spikes.
+
+Security & Compliance
+- Role-based access control limits who can see what (students can’t view unapproved feedback).
+- FERPA-aware data handling: Only store what we need; data retention policies for submissions and reports.
+- Secrets management: No secrets in code; environment variables or managed secrets store.
+- Audit trail: Record who approved/rejected what and when.
+
+Performance Targets (non-functional)
+- Feedback turnaround: Aim < 10s for typical code sizes.
+- Uptime: 99.5% target with health checks and rolling deploys.
+- UX: Important actions reachable in ≤ 3 clicks; clear pending states (e.g., "Feedback pending instructor review").
+
+Local Dev Experience
+- One-command startup via Docker Compose (DB, backend, frontend, worker).
+- Seed scripts for demo data (sample users, assignments, submissions).
+- Mock mode for LLM and plagiarism services to make local testing deterministic.
+
+How this all fits together (short version)
+- Instructor uploads code -> Backend validates & stores -> Analysis job hits LLM -> AI feedback saved as draft -> Instructor reviews (approve/reject/edit) -> Approved comments become visible to the student -> Optional plagiarism check runs -> Instructor can export a PDF/CSV report.
+
+Final note (student to student)
+We picked a pretty standard, practical stack: React/TS on the front, Django/Python on the back, Docker+ECS to ship it. The twist is the LLM bit, which we treat carefully with schema checks and a human-in-the-loop. It’s fast enough for classroom use and keeps instructors in control.
