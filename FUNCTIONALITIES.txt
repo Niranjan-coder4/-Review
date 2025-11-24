@@ -1,0 +1,580 @@
+//Review - Complete Functionality and Use Cases Documentation
+
+Why this document exists
+This document provides a comprehensive explanation of all functionalities in the //Review application, their use cases, and how they work together to form a complete code review system. This is written for developers, instructors, and stakeholders who need to understand the system's capabilities and workflows.
+
+High-level system overview
+The //Review system is an LLM-powered code review platform that automates preliminary code analysis while maintaining instructor oversight. The system follows a workflow where students submit code, AI analyzes it, instructors review and approve feedback, and students receive approved feedback. The system also includes plagiarism detection, export capabilities, and course management features.
+
+Core functional components
+1. User Authentication and Authorization
+2. File Upload and Validation
+3. Code Analysis and AI Integration
+4. Feedback Generation and Management
+5. Instructor Approval Workflow
+6. Student Dashboard and Feedback Viewing
+7. Submission History Tracking
+8. Plagiarism Detection
+9. Export Functionality
+10. Course and Assignment Management
+
+How components work together
+The system follows a linear workflow with feedback loops: Student uploads code -> System validates and stores file -> AI analyzes code -> Feedback created as pending -> Instructor reviews feedback -> Approved feedback visible to student -> Optional plagiarism check runs -> Instructor can export reports. Each component depends on previous steps and enables subsequent actions.
+
+DETAILED FUNCTIONALITY BREAKDOWN
+
+1. USER AUTHENTICATION AND AUTHORIZATION
+
+Functionality description
+The system implements role-based access control with three user roles: Student, Instructor, and Administrator. Authentication uses Django's session-based authentication with CSRF protection. Each user has a role that determines what data they can access and what actions they can perform.
+
+Use cases
+
+Student role use cases
+- Students can log in with username and password to access their personal dashboard
+- Students can view only their own submissions and feedback
+- Students can upload code files for assignments they are enrolled in
+- Students can view their submission history and track progress
+- Students can see approved feedback but cannot see pending or rejected feedback
+- Students cannot view other students' submissions or feedback
+- Students cannot approve, reject, or edit feedback
+
+Instructor role use cases
+- Instructors can log in and access the instructor dashboard
+- Instructors can create courses and manage course enrollment
+- Instructors can create assignments and link them to courses
+- Instructors can view all submissions for their assignments
+- Instructors can review, approve, reject, or edit AI-generated feedback
+- Instructors can view plagiarism reports and investigate potential issues
+- Instructors can export PDF reports and CSV data for assignments
+- Instructors can create student accounts for their courses
+- Instructors can view statistics and analytics for their courses
+
+Administrator role use cases
+- Administrators have full system access
+- Administrators can manage all users, courses, and assignments
+- Administrators can access system-wide statistics and reports
+- Administrators can override any permission restrictions
+
+How it works
+When a user logs in, the system validates credentials and creates a session. The session stores the user's ID and role. Every API request checks the user's role and permissions before allowing access. The frontend adapts the UI based on the user's role, showing different navigation options and features. The backend enforces permissions at the API level, ensuring students cannot access instructor-only endpoints even if they manipulate the frontend.
+
+Integration with other components
+Authentication is the foundation for all other functionalities. Without proper authentication, users cannot access any features. The role determines which components are accessible: students see the student dashboard and feedback viewer, instructors see the review queue and course management, and admins see everything. The authorization layer ensures data isolation between users and prevents unauthorized access.
+
+2. FILE UPLOAD AND VALIDATION
+
+Functionality description
+The system accepts code file uploads in multiple formats (Python .py, Java .java, C++ .cpp) and ZIP archives containing multiple files. Files are validated for type, size, and encoding before being stored. The system stores files on disk in organized directories and maintains database records with file metadata.
+
+Use cases
+
+Single file upload use case
+- Student selects a single code file from their computer
+- System validates file extension matches supported types
+- System checks file size is under 16MB limit
+- System validates file encoding is UTF-8
+- System stores file in submissions directory with date-based organization
+- System creates database record linking file to assignment and student
+- System triggers code analysis automatically
+
+ZIP archive upload use case
+- Student uploads a ZIP file containing multiple code files
+- System extracts ZIP archive to temporary location
+- System validates each extracted file individually
+- System processes each valid file as a separate submission
+- System handles errors for invalid files while processing valid ones
+- System creates multiple submission records, one per file
+- System triggers analysis for each valid file
+
+File validation use cases
+- Invalid file type: System rejects .txt, .doc, or other non-code files with clear error message
+- File too large: System rejects files over 16MB with size limit error
+- Encoding issues: System detects non-UTF-8 files and provides encoding error
+- Corrupted ZIP: System detects invalid ZIP archives and provides extraction error
+- Empty file: System detects and rejects empty files with appropriate message
+
+How it works
+The frontend file input accepts multiple file types and ZIP archives. When a file is selected, the frontend performs basic client-side validation (file type, size) before upload. The file is sent to the backend via multipart form data. The backend receives the file, performs server-side validation (type, size, encoding), and stores it in the media/submissions directory with a path like submissions/2024/12/15/filename.py. The database Submission model stores the file path, filename, file type, and links to the assignment and student. If validation fails at any step, the system returns an error message and does not store the file.
+
+Integration with other components
+File upload is the entry point for the code review workflow. After successful upload, the system automatically triggers code analysis. The stored file path is used by the code analysis service to read file content. The file is also used by the plagiarism detection service for similarity comparisons. The file metadata (filename, type, size) is displayed in the submission history and used in export reports. The file content is displayed in the code viewer when students or instructors view feedback.
+
+3. CODE ANALYSIS AND AI INTEGRATION
+
+Functionality description
+The system analyzes uploaded code using either an external LLM API (OpenAI, Hugging Face, Groq) or an intelligent pattern-based fallback system. The analysis identifies syntax errors, logic issues, style problems, performance concerns, and best practice violations. The analysis generates structured feedback with line numbers, severity levels, and categorized messages.
+
+Use cases
+
+AI-powered analysis use case
+- System reads code content from stored file
+- System constructs prompt with code context and language-specific guidelines
+- System sends prompt to configured LLM API (OpenAI, Hugging Face, or Groq)
+- LLM returns structured feedback in JSON format
+- System validates LLM response against expected schema
+- System parses feedback into structured format with line numbers and severity
+- System stores feedback items in database with pending status
+- System updates submission status to pending_review
+
+Pattern-based fallback use case
+- System attempts AI API call
+- AI API is unavailable, returns error, or times out
+- System automatically switches to pattern-based analysis
+- System scans code for common patterns: missing docstrings, long functions, magic numbers, unused variables
+- System checks for language-specific issues: Python PEP 8 violations, Java naming conventions, C++ memory management
+- System generates feedback items based on detected patterns
+- System stores feedback with same structure as AI-generated feedback
+- System continues workflow normally with pattern-based feedback
+
+Multi-language analysis use cases
+- Python code: System checks for PEP 8 style, proper exception handling, docstring presence, list comprehensions vs loops
+- Java code: System checks for naming conventions, proper class structure, exception handling, access modifiers
+- C++ code: System checks for memory management, pointer usage, const correctness, header guards
+
+Analysis categories use cases
+- Syntax errors: System identifies missing brackets, semicolons, incorrect indentation, invalid operators
+- Logic issues: System identifies infinite loops, unreachable code, incorrect conditionals, off-by-one errors
+- Style problems: System identifies inconsistent naming, missing whitespace, long lines, complex functions
+- Performance concerns: System identifies inefficient algorithms, unnecessary loops, missing caching opportunities
+- Best practices: System identifies missing error handling, security vulnerabilities, code duplication, missing documentation
+
+How it works
+The CodeAnalysisService class handles all analysis logic. When analysis is triggered, the service reads the file content using the Submission model's get_file_content method. The service checks if an AI API key is configured. If yes, it constructs a detailed prompt including the code, language type, and analysis requirements. The prompt requests JSON-formatted feedback with specific fields. The service sends the request to the configured API endpoint with proper authentication headers. If the API call succeeds, the service parses the JSON response and validates it. If the API call fails or no API key is configured, the service uses the _generate_mock_feedback method which applies pattern matching rules to identify common issues. The service returns a structured response with success status and an array of feedback items. Each feedback item includes line number, severity (critical, warning, suggestion), category (syntax, logic, style, performance, security, best_practice), and message text.
+
+Integration with other components
+Code analysis is triggered automatically after file upload. The analysis results are stored as Feedback objects linked to the Submission. The feedback items are created with pending status, requiring instructor approval before students can see them. The feedback is used by the instructor review queue to display items needing review. The feedback is used by the code viewer to display inline annotations. The feedback is used by export services to generate PDF and CSV reports. The analysis timing and results affect the submission status, which is displayed in dashboards and history views.
+
+4. FEEDBACK GENERATION AND MANAGEMENT
+
+Functionality description
+The system generates, stores, and manages feedback items associated with code submissions. Each feedback item has a line number, severity level, category, message, and status. Feedback can be in pending, approved, rejected, or edited states. Only approved feedback is visible to students.
+
+Use cases
+
+Feedback creation use case
+- Code analysis completes and returns feedback items
+- System creates Feedback database records for each item
+- Each feedback record links to the submission, has a line number, severity, category, and message
+- All feedback items are initially created with status pending
+- System updates submission status to pending_review
+- System creates timestamp for when feedback was generated
+
+Feedback viewing use case (student)
+- Student navigates to feedback page or clicks view feedback on submission
+- System queries database for approved feedback items for that submission
+- System groups feedback by severity level for display
+- System displays feedback in code viewer with inline annotations
+- Student sees line numbers highlighted with color coding (red for critical, yellow for warning, blue for suggestion)
+- Student can see summary report grouped by category
+
+Feedback viewing use case (instructor)
+- Instructor navigates to review queue
+- System queries database for all pending feedback items for instructor's assignments
+- System groups feedback by submission for easier review
+- Instructor sees all feedback items including pending, approved, and rejected
+- Instructor can view feedback in context with full code display
+- Instructor can see statistics: total items, pending count, approved count
+
+Feedback status management use cases
+- Pending: Feedback created by AI but not yet reviewed by instructor
+- Approved: Instructor reviewed and approved, now visible to student
+- Rejected: Instructor reviewed and rejected, not visible to student
+- Edited: Instructor modified the feedback message before approving
+
+How it works
+The Feedback model stores each feedback item with fields: submission (ForeignKey), line (IntegerField), severity (CharField with choices), category (CharField with choices), message (TextField), status (CharField with choices), created_at (DateTimeField), approved_at (DateTimeField), approved_by (ForeignKey to User). When code analysis completes, the FileUploadView creates Feedback objects in a database transaction. The serializer converts Feedback objects to JSON for API responses. The frontend displays feedback using the code viewer component which reads the code file and overlays feedback annotations at the specified line numbers. The status field controls visibility: students can only query for approved feedback, while instructors can query for all statuses.
+
+Integration with other components
+Feedback is created by the code analysis service and stored by the file upload handler. Feedback is displayed in the code viewer component which reads both the code file and feedback records. Feedback status changes are handled by the instructor approval workflow. Feedback is included in export reports (PDF and CSV). Feedback counts are displayed in dashboard statistics. Feedback is used by plagiarism detection to identify similar code patterns. The feedback approval timestamp is used to track review turnaround time.
+
+5. INSTRUCTOR APPROVAL WORKFLOW
+
+Functionality description
+All AI-generated feedback must be reviewed and approved by an instructor before students can see it. Instructors can approve, reject, or edit individual feedback items. Instructors can also perform bulk actions on multiple items. The system tracks who approved feedback and when.
+
+Use cases
+
+Individual feedback approval use case
+- Instructor views review queue and sees list of submissions with pending feedback
+- Instructor clicks on a submission to view code and feedback items
+- Instructor reviews each feedback item in context of the code
+- Instructor clicks Approve button on a helpful feedback item
+- System updates feedback status to approved
+- System records instructor ID and approval timestamp
+- System updates submission status if all feedback is approved
+- Student can now see this approved feedback item
+
+Individual feedback rejection use case
+- Instructor reviews a feedback item and determines it is incorrect or unhelpful
+- Instructor clicks Reject button on the feedback item
+- System updates feedback status to rejected
+- System records rejection timestamp
+- Student never sees this rejected feedback item
+- Rejected items remain in database for audit trail but are hidden from student view
+
+Feedback editing use case
+- Instructor reviews a feedback item and wants to modify the message
+- Instructor clicks Edit button and modifies the feedback message text
+- Instructor saves the edited feedback
+- System updates feedback status to edited
+- System stores the original message and edited message
+- System records who edited and when
+- Student sees the edited version of the feedback
+
+Bulk approval use case
+- Instructor reviews a submission and determines all feedback items are correct
+- Instructor clicks Approve All button for the submission
+- System updates all pending feedback items for that submission to approved
+- System records bulk approval with instructor ID and timestamp
+- System updates submission status to feedback_ready
+- All approved feedback becomes visible to student immediately
+
+Bulk rejection use case
+- Instructor determines all feedback for a submission is incorrect
+- Instructor clicks Reject All button
+- System updates all pending feedback items to rejected
+- System records bulk rejection
+- No feedback is shown to student for this submission
+- Instructor can add manual feedback if needed
+
+Review queue management use case
+- Instructor navigates to review queue page
+- System displays all submissions with pending feedback, grouped by assignment
+- System shows summary statistics: total pending items, submissions needing review
+- Instructor can filter by assignment, date, or student
+- Instructor can sort by submission date or number of pending items
+- Instructor can view code and feedback side-by-side for efficient review
+
+How it works
+The FeedbackViewSet provides API endpoints for updating feedback status. The approve action accepts a feedback ID and updates the status field to approved, sets approved_at timestamp, and sets approved_by to the current instructor user. The reject action updates status to rejected. The update action allows modifying the message field and automatically sets status to edited. The frontend calls these API endpoints when instructors click approve, reject, or edit buttons. The API enforces permissions: only instructors and admins can modify feedback status. The system uses database transactions to ensure atomic updates. The submission status is automatically updated when all feedback items for a submission are approved.
+
+Integration with other components
+The approval workflow depends on feedback being created by code analysis. The workflow updates feedback status which controls visibility in the student feedback viewer. The approval actions update submission status which affects dashboard displays. The approval timestamps are used in export reports to show review turnaround time. The approval workflow is the gatekeeper ensuring quality control before students see feedback. The workflow integrates with the code viewer so instructors can see feedback in context during review.
+
+6. STUDENT DASHBOARD AND FEEDBACK VIEWING
+
+Functionality description
+Students have a personalized dashboard showing their assignment statistics, submission counts, and feedback status. Students can view approved feedback in an interactive code viewer with inline annotations. The dashboard provides quick navigation to all student features.
+
+Use cases
+
+Dashboard display use case
+- Student logs in and is redirected to dashboard
+- System queries database for student's submissions and feedback
+- System calculates statistics: total submissions, assignments with feedback, pending reviews
+- System displays welcome message with student name
+- System shows stat cards with key metrics
+- System displays list of recent assignments with status indicators
+- Student can click on any assignment to view details
+
+Feedback viewing use case
+- Student clicks View Feedback button on a submission
+- System opens code viewer modal with full code display
+- System reads code file from disk storage
+- System queries database for approved feedback items for this submission
+- System displays code with line numbers
+- System highlights lines with feedback using color coding
+- System displays feedback annotations next to relevant lines
+- System groups feedback by severity in a sidebar
+- Student can scroll through code and see all feedback in context
+
+Feedback summary use case
+- Student views feedback page
+- System displays summary report grouped by severity level
+- Critical issues shown first with red indicators
+- Warnings shown second with yellow indicators
+- Suggestions shown third with blue indicators
+- Each feedback item shows line number, category, and message
+- Student can click on any item to jump to that line in code viewer
+
+Assignment status tracking use case
+- Student views dashboard and sees assignment list
+- Each assignment shows current status: Not Submitted, Submitted, Analyzing, Pending Review, Feedback Ready
+- Student can see which assignments have new feedback
+- Student can see submission attempt numbers
+- Student can see dates for each submission
+
+How it works
+The frontend dashboard component calls the API to fetch current user data, submissions, and feedback. The API filters data based on the authenticated user's ID, ensuring students only see their own data. The dashboard displays statistics calculated from the filtered data. The code viewer component reads the submission file using the file path stored in the database. The code viewer parses the code and overlays feedback annotations at the specified line numbers. The feedback is filtered to only include items with approved status. The frontend uses color coding: red background for critical feedback lines, yellow for warnings, blue for suggestions. The code viewer supports syntax highlighting based on file type.
+
+Integration with other components
+The dashboard displays data from submissions, feedback, and assignments. The dashboard status indicators reflect submission status which is updated by the code analysis and approval workflows. The feedback viewer depends on approved feedback from the instructor approval workflow. The code viewer reads files stored by the file upload component. The dashboard statistics are calculated from database queries filtered by the authenticated user from the authentication component. The dashboard provides navigation to submission history, which is another component.
+
+7. SUBMISSION HISTORY TRACKING
+
+Functionality description
+The system maintains a complete history of all student submissions for each assignment. Students can view their submission history to track progress across multiple attempts. Each submission record includes attempt number, timestamp, status, file information, and associated feedback.
+
+Use cases
+
+Submission history display use case
+- Student navigates to submission history page
+- System queries database for all submissions by the student, ordered by date
+- System groups submissions by assignment
+- System displays each submission with attempt number, date, status, filename
+- Student can see progression: Attempt 1, Attempt 2, Attempt 3
+- Student can compare different attempts to see improvements
+
+Attempt tracking use case
+- Student submits code for an assignment (first time)
+- System creates submission with attempt_number = 1
+- Student receives feedback and makes improvements
+- Student submits again for same assignment
+- System creates new submission with attempt_number = 2
+- System maintains both submissions in history
+- Student can view both attempts and see what changed
+
+Status tracking use case
+- Each submission has a status field tracking its lifecycle
+- Submitted: File uploaded, waiting for analysis
+- Analyzing: Code analysis in progress
+- Pending Review: Analysis complete, feedback awaiting instructor approval
+- Feedback Ready: All feedback approved, student can view
+- Resubmitted: Student submitted a new attempt after receiving feedback
+
+History comparison use case
+- Student views history and sees multiple attempts for same assignment
+- Student can view code from Attempt 1 and Attempt 2 side-by-side
+- Student can see feedback differences between attempts
+- Student can track improvement: fewer critical issues, better style scores
+- System helps student understand their learning progress
+
+How it works
+The Submission model includes attempt_number field which is automatically incremented based on existing submissions for the same assignment and student. The system uses a unique_together constraint on assignment, student, and attempt_number to prevent duplicates. When a student uploads a file, the system checks for existing submissions and sets attempt_number accordingly. The submission history page queries all Submission objects filtered by the current student, ordered by submitted_at timestamp descending. Each submission record includes links to view code, view feedback, and export reports. The frontend displays submissions in a table or list format with expandable details.
+
+Integration with other components
+Submission history depends on the file upload component creating submission records. The history displays status which is updated by code analysis and approval workflows. The history includes links to view code which uses the code viewer component. The history includes links to view feedback which uses the feedback viewer component. The history shows attempt numbers which are calculated during file upload. The history is filtered by authenticated user from the authentication component. The history data is included in export reports.
+
+8. PLAGIARISM DETECTION
+
+Functionality description
+The system automatically compares code submissions to detect similarity and potential plagiarism. The system uses multiple algorithms to calculate similarity scores and flags submissions with high similarity for instructor review. Plagiarism detection runs automatically after code analysis completes.
+
+Use cases
+
+Automatic plagiarism check use case
+- Student submits code for an assignment
+- Code analysis completes successfully
+- System automatically triggers plagiarism detection
+- System compares new submission against all other submissions for the same assignment
+- System calculates similarity scores using multiple algorithms
+- System creates PlagiarismReport records for pairs with high similarity
+- System flags submissions with similarity above 90% threshold
+- Instructor is notified of potential plagiarism cases
+
+Similarity calculation use case
+- System reads code content from two submission files
+- System normalizes code by removing comments and whitespace
+- System calculates token-based Jaccard similarity (set intersection over union)
+- System calculates N-gram sequence similarity (sliding window comparison)
+- System calculates line-by-line matching percentage
+- System combines algorithms to produce overall similarity score
+- System stores score and algorithm details in PlagiarismReport record
+
+High similarity flagging use case
+- System calculates similarity score of 95% between two submissions
+- System creates PlagiarismReport with similarity_score = 95
+- System sets flagged = True because score exceeds 90% threshold
+- System links report to both submission records
+- Instructor sees flagged report in plagiarism reports page
+- Instructor can investigate and take appropriate action
+
+Instructor review use case
+- Instructor navigates to plagiarism reports page
+- System displays all flagged reports with similarity scores
+- Instructor can view both submissions side-by-side
+- Instructor can see highlighted similar sections
+- Instructor can dismiss false positives (legitimate collaboration, template code)
+- Instructor can take action on confirmed plagiarism cases
+
+How it works
+The PlagiarismDetectionService class handles all similarity calculations. When triggered, the service queries all submissions for the same assignment. The service compares the new submission against each existing submission pairwise. For each pair, the service reads both code files using get_file_content methods. The service normalizes code by removing comments (lines starting with #, //, or /* */), removing whitespace, and converting to lowercase. The service calculates three similarity metrics: Jaccard similarity on token sets, N-gram similarity on code sequences, and line-by-line exact match percentage. The service combines these metrics with weighted averaging to produce a final similarity score. If the score exceeds the threshold (default 90%), the service creates a PlagiarismReport record with flagged=True. The service stores algorithm details for transparency. The frontend displays reports grouped by assignment with sortable similarity scores.
+
+Integration with other components
+Plagiarism detection is triggered automatically after code analysis completes. The detection reads code files stored by the file upload component. The detection creates PlagiarismReport records which are displayed in the instructor dashboard. The reports link to Submission records, so instructors can view the actual code. The detection uses the same file reading mechanism as the code viewer. The reports are included in export functionality for documentation. The detection respects assignment boundaries, only comparing submissions within the same assignment.
+
+9. EXPORT FUNCTIONALITY
+
+Functionality description
+Instructors can export assignment data and feedback in PDF and CSV formats. PDF exports generate professional reports with code, feedback, and summary statistics. CSV exports provide tabular data for spreadsheet analysis. Exports include WSU branding and proper formatting.
+
+Use cases
+
+PDF report export use case
+- Instructor views a student's submission with feedback
+- Instructor clicks Export PDF button
+- System generates PDF report including: assignment details, student information, full code with line numbers, all approved feedback items grouped by severity, summary statistics
+- System applies WSU color scheme and branding
+- System creates downloadable PDF file
+- Instructor downloads PDF for records or sharing
+
+CSV data export use case
+- Instructor views assignment overview page
+- Instructor clicks Export CSV button
+- System generates CSV file with columns: Student Name, Submission Date, Attempt Number, Status, Feedback Count, Critical Issues, Warnings, Suggestions
+- System includes all submissions for the assignment
+- System creates downloadable CSV file
+- Instructor opens CSV in Excel or Google Sheets for analysis
+
+Bulk export use case
+- Instructor wants reports for all students in an assignment
+- Instructor selects multiple submissions
+- Instructor clicks Bulk Export button
+- System generates individual PDF reports for each selected submission
+- System creates ZIP archive containing all PDFs
+- Instructor downloads ZIP file with all reports
+
+Export job tracking use case
+- System creates ExportJob record when export is requested
+- System tracks export status: pending, processing, completed, failed
+- System stores export file path and metadata
+- Instructor can view export history and re-download previous exports
+- System handles export failures gracefully with error messages
+
+How it works
+The ExportService class handles PDF and CSV generation. For PDF exports, the service uses the reportlab library to create PDF documents. The service reads submission data, feedback items, and code content. The service formats the PDF with headers, sections, tables, and code blocks. The service applies WSU colors (crimson red #981E32, gray #5E6A71) to headers and accents. The service includes page numbers, timestamps, and professional formatting. For CSV exports, the service uses openpyxl or csv module to create tabular data. The service queries all submissions for an assignment and formats data into rows and columns. The service creates file responses with appropriate MIME types (application/pdf, text/csv). The frontend triggers exports via API calls and handles file downloads. The backend stores export jobs in the ExportJob model for tracking and history.
+
+Integration with other components
+Export functionality reads data from submissions, feedback, assignments, and users. The export uses the same file reading mechanism as the code viewer to get code content. The export filters feedback to show only approved items (for student-facing reports) or all items (for instructor reports). The export uses assignment and course data for report headers. The export respects user permissions: only instructors can export data. The export files are stored in the media directory similar to submission files. The export job tracking integrates with the database for audit trails.
+
+10. COURSE AND ASSIGNMENT MANAGEMENT
+
+Functionality description
+Instructors can create and manage courses, enroll students, and create assignments linked to courses. The system supports multiple courses per instructor and multiple assignments per course. Students can be enrolled in multiple courses.
+
+Use cases
+
+Course creation use case
+- Instructor navigates to courses page
+- Instructor clicks Create Course button
+- Instructor enters course code (e.g., "CPT_S 322"), course name, and description
+- System creates Course record with instructor set to current user
+- System sets course as active by default
+- Instructor can now add students and create assignments for this course
+
+Student enrollment use case
+- Instructor views course details page
+- Instructor clicks Add Student button
+- Instructor enters student username or student ID
+- System finds student user account
+- System adds student to course's students ManyToMany relationship
+- Student can now see this course in their dashboard
+- Student can submit assignments for this course
+
+Assignment creation use case
+- Instructor navigates to assignments page or course detail page
+- Instructor clicks Create Assignment button
+- Instructor enters assignment title, description, due date, max submissions
+- Instructor selects course to link assignment to (optional)
+- System creates Assignment record with instructor set to current user
+- System links assignment to selected course if provided
+- Students enrolled in the course can now see and submit to this assignment
+
+Student account creation use case
+- Instructor needs to create student accounts for their course
+- Instructor navigates to student management page
+- Instructor clicks Create Student button
+- Instructor enters username, email, password, and student ID
+- System creates User account with role=student
+- System automatically enrolls student in instructor's active courses
+- Student receives account credentials and can log in
+
+Course management use case
+- Instructor views list of all their courses
+- Instructor can see course code, name, student count, assignment count
+- Instructor can edit course details (name, description)
+- Instructor can activate or deactivate courses
+- Instructor can remove students from courses
+- Instructor can view all students enrolled in a course
+
+Assignment management use case
+- Instructor views list of all assignments
+- Instructor can see assignment title, linked course, due date, submission count
+- Instructor can edit assignment details
+- Instructor can view all submissions for an assignment
+- Instructor can set assignment as active or inactive
+- Instructor can link or unlink assignments from courses
+
+How it works
+The Course model stores course information with a ForeignKey to User (instructor) and a ManyToMany relationship to User (students). The Assignment model stores assignment information with ForeignKey to User (instructor) and optional ForeignKey to Course. The CourseViewSet and AssignmentViewSet provide CRUD operations via REST API. The API enforces permissions: only instructors can create courses and assignments, students can only view courses they are enrolled in. The frontend provides forms for creating and editing courses and assignments. The frontend displays course and assignment lists with filtering and sorting. The system automatically filters assignments by course when students view their dashboard. The CreateStudentView allows instructors to create student accounts with proper role assignment.
+
+Integration with other components
+Course management integrates with user authentication to determine which courses an instructor can manage. Course enrollment determines which assignments students can see and submit to. Assignment creation links to courses, which affects the assignment display in student dashboards. Student account creation integrates with the authentication system. Course and assignment data is used throughout the system: in dashboards, submission forms, review queues, and export reports. The course code and name appear in export PDFs and assignment listings.
+
+SYSTEM WORKFLOWS AND INTEGRATION
+
+Complete student submission workflow
+1. Student logs in and views dashboard showing available assignments
+2. Student selects an assignment and clicks Upload button
+3. Student selects code file or ZIP archive from computer
+4. System validates file (type, size, encoding) on frontend
+5. Student clicks Submit button
+6. Frontend sends file to backend via multipart form data
+7. Backend validates file again on server side
+8. Backend stores file in media/submissions directory
+9. Backend creates Submission record with status=submitted
+10. Backend triggers CodeAnalysisService to analyze code
+11. CodeAnalysisService reads file content and calls AI API or uses pattern matching
+12. CodeAnalysisService returns structured feedback items
+13. Backend creates Feedback records with status=pending for each item
+14. Backend updates Submission status to pending_review
+15. System displays success message to student
+16. Student sees submission in their history with status "Pending Review"
+17. Instructor receives notification (or sees in review queue) of new feedback
+18. Instructor reviews feedback items and approves/rejects/edits them
+19. System updates Feedback status to approved for approved items
+20. System updates Submission status to feedback_ready when all items approved
+21. Student can now view approved feedback in code viewer
+22. System automatically runs plagiarism detection comparing to other submissions
+23. System creates PlagiarismReport if high similarity detected
+24. Instructor can export PDF or CSV reports at any time
+
+Complete instructor review workflow
+1. Instructor logs in and views instructor dashboard
+2. Instructor navigates to Review Queue page
+3. System displays all submissions with pending feedback, grouped by assignment
+4. Instructor clicks on a submission to review
+5. System displays code viewer with code and all feedback items (pending, approved, rejected)
+6. Instructor reviews each feedback item in context
+7. Instructor clicks Approve on correct feedback items
+8. System updates feedback status to approved and records approval timestamp
+9. Instructor clicks Reject on incorrect feedback items
+10. System updates feedback status to rejected
+11. Instructor clicks Edit on feedback items needing modification
+12. Instructor modifies feedback message and saves
+13. System updates feedback status to edited
+14. When all feedback reviewed, system updates submission status
+15. Approved feedback becomes visible to student immediately
+16. Instructor can view plagiarism reports for flagged submissions
+17. Instructor can export PDF reports for documentation
+
+Course and assignment setup workflow
+1. Instructor logs in and navigates to Courses page
+2. Instructor creates a new course with code, name, and description
+3. System creates Course record linked to instructor
+4. Instructor creates student accounts or adds existing students to course
+5. System enrolls students in course via ManyToMany relationship
+6. Instructor creates assignments and links them to the course
+7. System creates Assignment records linked to course and instructor
+8. Students enrolled in course can now see assignments in their dashboard
+9. Students can submit code files for these assignments
+10. Instructor can manage course enrollment, add/remove students
+11. Instructor can edit assignment details, due dates, max submissions
+12. Instructor can view all submissions and feedback for course assignments
+
+Data flow and dependencies
+Authentication is the foundation: all other components depend on knowing who the user is and what role they have. File upload creates the data that feeds into code analysis. Code analysis creates feedback that feeds into the approval workflow. The approval workflow controls what students can see. Submission history tracks the progression of uploads and approvals. Plagiarism detection reads the same files as code analysis and creates additional data for instructors. Export functionality reads from all other components to generate comprehensive reports. Course and assignment management structures the organizational hierarchy that determines access and relationships between users, assignments, and submissions.
+
+Performance considerations
+The system is designed to handle concurrent users efficiently. File uploads are stored on disk rather than in database for better performance with large files. Code analysis uses async-ready architecture and can be parallelized. Plagiarism detection runs automatically but could be moved to background tasks for large classes. Database queries are optimized with proper indexing on foreign keys and frequently queried fields. The frontend uses auto-refresh every 30 seconds to keep data current without constant polling. Export generation happens server-side to avoid browser memory issues with large datasets.
+
+Security and compliance
+All file uploads are validated for type and size to prevent malicious uploads. User authentication ensures only authorized users can access the system. Role-based permissions prevent students from accessing instructor features. CSRF protection prevents cross-site request forgery attacks. File paths are sanitized to prevent directory traversal attacks. Student data is isolated so students cannot see other students' submissions. FERPA compliance is maintained by restricting access to student data to authorized instructors only. All data access is logged for audit trails. Export functionality respects the same permission boundaries as the rest of the system.
+
+Error handling and fallbacks
+The system includes comprehensive error handling at every level. File upload errors are caught and returned as user-friendly messages. Code analysis failures automatically fall back to pattern-based analysis so the workflow never completely fails. API timeouts are handled gracefully with retry logic or fallback to mock analysis. Database errors are caught and logged without exposing internal details to users. Frontend errors are displayed as user-friendly messages. Export generation failures return clear error messages with retry options. The system is designed to degrade gracefully: if AI analysis fails, pattern-based analysis still provides value. If export fails, users can retry. If a specific feature fails, other features continue to work.
+
+Final notes
+This system represents a complete code review platform with all core functionalities working together. Each component is designed to be modular and can function independently, but they work best as an integrated system. The workflows are designed to be intuitive for both students and instructors while maintaining security and data integrity. The system scales from small classes to large courses with hundreds of students. The architecture supports future enhancements like real-time notifications, advanced analytics, and integration with learning management systems.
+
