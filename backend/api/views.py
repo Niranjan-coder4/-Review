@@ -10,6 +10,8 @@ from datetime import datetime
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -112,14 +114,53 @@ class AssignmentViewSet(viewsets.ModelViewSet):
                 queryset = queryset.filter(course_id=course_id)
             return queryset
         elif user.is_student():
-            # Students see assignments from courses they're enrolled in
-            queryset = Assignment.objects.filter(course__students=user, course__is_active=True)
+            # Students see:
+            # 1. Standalone assignments (no course assigned)
+            # 2. Assignments from courses they're enrolled in
+            from django.db.models import Q
+            queryset = Assignment.objects.filter(
+                Q(course__isnull=True) |  # Standalone assignments
+                Q(course__students=user, course__is_active=True)  # Assignments from enrolled courses
+            )
             if course_id:
                 queryset = queryset.filter(course_id=course_id)
             return queryset
         return Assignment.objects.none()
     
+    def create(self, request, *args, **kwargs):
+        """Override create to add better error handling and logging."""
+        try:
+            serializer = self.get_serializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            self.perform_create(serializer)
+            # Refresh the instance from database to ensure all relationships are loaded
+            instance = serializer.instance
+            if instance:
+                instance.refresh_from_db()
+            # Use a fresh serializer for the response
+            response_serializer = self.get_serializer(instance)
+            headers = self.get_success_headers(response_serializer.data)
+            return Response(response_serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+        except Exception as e:
+            import traceback
+            error_msg = str(e)
+            traceback.print_exc()
+            print(f"Assignment creation error: {error_msg}")
+            print(f"Request data: {request.data}")
+            return Response(
+                {'error': f'Failed to create assignment: {error_msg}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
     def perform_create(self, serializer):
+        # Validate that course belongs to instructor if provided
+        course = serializer.validated_data.get('course')
+        if course:
+            # If course is provided, ensure it belongs to the instructor
+            if hasattr(course, 'instructor') and course.instructor != self.request.user:
+                from rest_framework.exceptions import ValidationError
+                raise ValidationError({'course': 'You can only assign assignments to your own courses.'})
+        # Save with instructor set
         serializer.save(instructor=self.request.user)
     
     @action(detail=True, methods=['get'])
@@ -431,18 +472,20 @@ class ExportView(APIView):
                           status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+@method_decorator(csrf_exempt, name='dispatch')
 class FileUploadView(APIView):
     """
     Handle file uploads for code analysis.
     Supports single files and ZIP archives.
+    CSRF exempt because it's protected by authentication.
     """
     permission_classes = [IsAuthenticated]
     
     def post(self, request):
-        if 'file' not in request.files:
+        if 'file' not in request.FILES:
             return Response({'error': 'No file provided'}, status=status.HTTP_400_BAD_REQUEST)
         
-        file = request.files['file']
+        file = request.FILES['file']
         assignment_id = request.data.get('assignment_id')
         
         if not assignment_id:
@@ -454,7 +497,9 @@ class FileUploadView(APIView):
             return Response({'error': 'Assignment not found'}, status=status.HTTP_404_NOT_FOUND)
         
         # Check if it's a ZIP file
-        if file.filename.lower().endswith('.zip'):
+        # Django uses .name instead of .filename
+        file_name = file.name if hasattr(file, 'name') else str(file)
+        if file_name.lower().endswith('.zip'):
             return self._handle_zip_upload(file, assignment, request.user)
         
         # Handle single file upload
@@ -464,7 +509,9 @@ class FileUploadView(APIView):
         """Handle single file upload."""
         # Validate file type
         allowed_extensions = {'py', 'java', 'cpp'}
-        file_extension = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
+        # Django uses .name instead of .filename
+        file_name = file.name if hasattr(file, 'name') else str(file)
+        file_extension = file_name.rsplit('.', 1)[1].lower() if '.' in file_name else ''
         
         if file_extension not in allowed_extensions:
             return Response({
@@ -500,7 +547,7 @@ class FileUploadView(APIView):
                 assignment=assignment,
                 student=user,
                 attempt_number=attempt_number,
-                filename=file.filename,
+                filename=file_name,
                 file_type=file_extension,
                 status='analyzing'
             )

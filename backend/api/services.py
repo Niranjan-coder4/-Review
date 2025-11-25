@@ -66,13 +66,9 @@ class CodeAnalysisService:
         
         Return only valid JSON array, no other text."""
         
-        headers = {
-            'Authorization': f'Bearer {self.ai_api_key}',
-            'Content-Type': 'application/json'
-        }
-        
-        # Detect if this is Hugging Face API
+        # Detect API type
         is_huggingface = 'huggingface.co' in self.ai_api_url.lower() or 'hf.co' in self.ai_api_url.lower() or 'router.huggingface.co' in self.ai_api_url.lower()
+        is_gemini = 'generativelanguage.googleapis.com' in self.ai_api_url.lower() or 'gemini' in self.ai_api_url.lower()
         
         # Update old Hugging Face URLs to new router endpoint
         if 'api-inference.huggingface.co' in self.ai_api_url:
@@ -84,8 +80,35 @@ class CodeAnalysisService:
                 self.ai_api_url = f'https://router.huggingface.co/models/{model_name}'
                 print(f"Updated Hugging Face URL to: {self.ai_api_url}")
         
-        if is_huggingface:
+        # Initialize request URL (will be modified for Gemini)
+        request_url = self.ai_api_url
+        headers = {}
+        data = {}
+        
+        if is_gemini:
+            # Google Gemini API format
+            # API key goes in URL as query parameter, not header
+            request_url = f"{self.ai_api_url}?key={self.ai_api_key}"
+            headers = {
+                'Content-Type': 'application/json'
+            }
+            data = {
+                'contents': [{
+                    'parts': [{
+                        'text': prompt
+                    }]
+                }],
+                'generationConfig': {
+                    'temperature': 0.3,
+                    'maxOutputTokens': 2000
+                }
+            }
+        elif is_huggingface:
             # Hugging Face Inference API format
+            headers = {
+                'Authorization': f'Bearer {self.ai_api_key}',
+                'Content-Type': 'application/json'
+            }
             data = {
                 'inputs': prompt,
                 'parameters': {
@@ -96,6 +119,10 @@ class CodeAnalysisService:
             }
         else:
             # OpenAI/OpenAI-compatible format
+            headers = {
+                'Authorization': f'Bearer {self.ai_api_key}',
+                'Content-Type': 'application/json'
+            }
             data = {
                 'model': 'gpt-3.5-turbo',
                 'messages': [
@@ -106,13 +133,24 @@ class CodeAnalysisService:
             }
         
         try:
-            response = requests.post(self.ai_api_url, headers=headers, json=data, timeout=30)
+            # request_url is already set above (includes API key for Gemini)
+            response = requests.post(request_url, headers=headers, json=data, timeout=30)
             response.raise_for_status()
             
             ai_response = response.json()
             
+            # Parse Gemini response
+            if is_gemini:
+                if 'candidates' in ai_response and len(ai_response['candidates']) > 0:
+                    candidate = ai_response['candidates'][0]
+                    if 'content' in candidate and 'parts' in candidate['content']:
+                        content = candidate['content']['parts'][0].get('text', '').strip()
+                    else:
+                        content = str(ai_response).strip()
+                else:
+                    content = str(ai_response).strip()
             # Parse Hugging Face response
-            if is_huggingface:
+            elif is_huggingface:
                 if isinstance(ai_response, list) and len(ai_response) > 0:
                     if 'generated_text' in ai_response[0]:
                         content = ai_response[0]['generated_text'].strip()
@@ -142,6 +180,16 @@ class CodeAnalysisService:
             except (json.JSONDecodeError, ValueError) as e:
                 print(f"Failed to parse AI response as JSON: {str(e)}")
                 print(f"Response content: {content[:500]}")
+                # For Gemini, try to extract JSON from markdown code blocks
+                if is_gemini:
+                    json_in_code_block = re.search(r'```(?:json)?\s*(\[.*?\])\s*```', content, re.DOTALL)
+                    if json_in_code_block:
+                        try:
+                            feedback = json.loads(json_in_code_block.group(1))
+                            if isinstance(feedback, list) and len(feedback) > 0:
+                                return {'success': True, 'feedback': feedback}
+                        except:
+                            pass
                 return self._generate_mock_feedback(code_content, file_extension)
         
         except requests.exceptions.RequestException as e:

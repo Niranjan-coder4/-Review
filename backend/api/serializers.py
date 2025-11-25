@@ -72,8 +72,8 @@ class AssignmentSerializer(serializers.ModelSerializer):
     Serializer for Assignment model.
     """
     instructor_name = serializers.CharField(source='instructor.get_full_name', read_only=True)
-    course_name = serializers.CharField(source='course.name', read_only=True)
-    course_code = serializers.CharField(source='course.code', read_only=True)
+    course_name = serializers.SerializerMethodField()
+    course_code = serializers.SerializerMethodField()
     submission_count = serializers.SerializerMethodField()
     
     class Meta:
@@ -84,9 +84,40 @@ class AssignmentSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at', 'submission_count'
         ]
         read_only_fields = ['id', 'instructor', 'created_at', 'updated_at']
+        extra_kwargs = {
+            'course': {'required': False, 'allow_null': True}
+        }
+    
+    def get_course_name(self, obj):
+        try:
+            if obj and hasattr(obj, 'course') and obj.course:
+                return obj.course.name
+            return None
+        except (AttributeError, Exception):
+            return None
+    
+    def get_course_code(self, obj):
+        try:
+            if obj and hasattr(obj, 'course') and obj.course:
+                return obj.course.code
+            return None
+        except (AttributeError, Exception):
+            return None
     
     def get_submission_count(self, obj):
         return obj.submissions.count()
+    
+    def validate_course(self, value):
+        """Convert empty string to None for course field."""
+        # Handle None, empty string, or empty UUID
+        if value is None or value == '':
+            return None
+        # If it's a string, check if it's empty after stripping
+        if isinstance(value, str):
+            stripped = value.strip()
+            if not stripped or stripped == 'null' or stripped == 'None':
+                return None
+        return value
 
 
 class SubmissionSerializer(serializers.ModelSerializer):
