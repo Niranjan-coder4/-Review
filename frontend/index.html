@@ -1,0 +1,266 @@
+<!--
+  Code Review System - Main Interface
+  - Purpose: Complete code review system with authentication, file upload, and feedback management
+  - Features: Login/logout, role-based access, file upload, feedback review, submission history
+  - Backend: Django REST API with PostgreSQL database
+-->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>//Review - Code Review System</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Login Form -->
+  <div id="login-section" class="login-section">
+    <div class="login-container">
+      <h1>//Review</h1>
+      <p class="subtitle">Code Review System</p>
+      
+      <form id="login-form">
+        <div class="form-group">
+          <label for="username">Username</label>
+          <input type="text" id="username" name="username" required>
+        </div>
+        
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input type="password" id="password" name="password" required>
+        </div>
+        
+        <button type="submit" id="login-btn">Login</button>
+        
+        <div class="register-link">
+          <p>Don't have an account? <a href="#" id="show-register">Register</a></p>
+        </div>
+      </form>
+      
+      <!-- Registration Form -->
+      <form id="register-form" style="display: none;">
+        <div class="form-group">
+          <label for="reg-username">Username</label>
+          <input type="text" id="reg-username" name="username" required>
+        </div>
+        
+        <div class="form-group">
+          <label for="reg-email">Email</label>
+          <input type="email" id="reg-email" name="email" required>
+        </div>
+        
+        <div class="form-group">
+          <label for="reg-first-name">First Name</label>
+          <input type="text" id="reg-first-name" name="first_name" required>
+        </div>
+        
+        <div class="form-group">
+          <label for="reg-last-name">Last Name</label>
+          <input type="text" id="reg-last-name" name="last_name" required>
+        </div>
+        
+        <div class="form-group">
+          <label for="reg-role">Role</label>
+          <select id="reg-role" name="role" required>
+            <option value="student">Student</option>
+            <option value="instructor">Instructor</option>
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label for="reg-student-id">Student ID (if student)</label>
+          <input type="text" id="reg-student-id" name="student_id">
+        </div>
+        
+        <div class="form-group">
+          <label for="reg-password">Password</label>
+          <input type="password" id="reg-password" name="password" required>
+        </div>
+        
+        <div class="form-group">
+          <label for="reg-password-confirm">Confirm Password</label>
+          <input type="password" id="reg-password-confirm" name="password_confirm" required>
+        </div>
+        
+        <button type="submit" id="register-btn">Register</button>
+        
+        <div class="login-link">
+          <p>Already have an account? <a href="#" id="show-login">Login</a></p>
+        </div>
+      </form>
+      
+      <p id="auth-message" class="message" aria-live="polite"></p>
+    </div>
+  </div>
+
+  <!-- Main Application -->
+  <div id="main-app" style="display: none;">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-content">
+        <h1>//Review</h1>
+        <div class="user-info">
+          <span id="user-name"></span>
+          <span id="user-role"></span>
+          <button id="logout-btn" class="logout-btn">Logout</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Navigation -->
+    <nav class="navigation">
+      <button class="nav-btn active" data-section="dashboard">Dashboard</button>
+      <button class="nav-btn" data-section="upload">Upload Code</button>
+      <button class="nav-btn" data-section="feedback">My Feedback</button>
+      <button class="nav-btn" data-section="history">Submission History</button>
+      <button class="nav-btn instructor-only" data-section="review">Review Feedback</button>
+      <button class="nav-btn instructor-only" data-section="plagiarism">Plagiarism Reports</button>
+      <button class="nav-btn instructor-only" data-section="assignments">Manage Assignments</button>
+    </nav>
+
+    <!-- Dashboard Section -->
+    <section id="dashboard-section" class="section active">
+      <div class="container">
+        <h2>Dashboard</h2>
+        <div id="dashboard-content">
+          <div class="welcome-message">
+            <p>Welcome to the Code Review System!</p>
+            <p>Use the navigation above to access different features.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Upload Section -->
+    <section id="upload-section" class="section">
+      <div class="container">
+        <h2>Upload Code</h2>
+        
+        <div class="form-group">
+          <label for="assignment-select">Assignment</label>
+          <select id="assignment-select" required>
+            <option value="">Select an assignment...</option>
+          </select>
+        </div>
+        
+        <form id="upload-form" novalidate>
+          <div class="form-group">
+            <label for="file-input" class="label">Choose a file (.py, .java, .cpp)</label>
+            <input id="file-input" type="file" accept=".py,.java,.cpp,.zip">
+          </div>
+          
+          <button id="upload-btn" type="button" disabled>Upload</button>
+          
+          <p id="upload-message" class="message" aria-live="polite"></p>
+        </form>
+      </div>
+    </section>
+
+    <!-- Feedback Section -->
+    <section id="feedback-section" class="section">
+      <div class="container">
+        <h2>My Feedback</h2>
+        <div id="feedback-content">
+          <div class="no-feedback">
+            <p>No feedback available yet.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- History Section -->
+    <section id="history-section" class="section">
+      <div class="container">
+        <h2>Submission History</h2>
+        <div id="history-content">
+          <div class="no-history">
+            <p>No submissions yet.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Review Section (Instructor Only) -->
+    <section id="review-section" class="section">
+      <div class="container">
+        <h2>Review Feedback</h2>
+        <div id="review-content">
+          <div class="no-pending">
+            <p>No pending feedback to review.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Plagiarism Section (Instructor Only) -->
+    <section id="plagiarism-section" class="section">
+      <div class="container">
+        <h2>Plagiarism Reports</h2>
+        <div id="plagiarism-content">
+          <div class="no-plagiarism">
+            <p>No plagiarism reports.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Assignments Management Section (Instructor Only) -->
+    <section id="assignments-section" class="section">
+      <div class="container">
+        <h2>Manage Assignments</h2>
+        <div id="assignments-content">
+          <div class="assignments-management">
+            <button type="button" id="create-assignment-btn" class="btn-primary">Create New Assignment</button>
+            <div id="assignment-form-container" style="display: none;">
+              <form id="assignment-form" class="assignment-form">
+                <div class="form-group">
+                  <label for="assignment-title">Assignment Title *</label>
+                  <input type="text" id="assignment-title" name="title" required>
+                </div>
+                
+                <div class="form-group">
+                  <label for="assignment-description">Description</label>
+                  <textarea id="assignment-description" name="description" rows="4"></textarea>
+                </div>
+                
+                <div class="form-group">
+                  <label for="assignment-course">Course (Optional)</label>
+                  <select id="assignment-course" name="course">
+                    <option value="">No course (standalone assignment)</option>
+                  </select>
+                </div>
+                
+                <div class="form-group">
+                  <label for="assignment-due-date">Due Date (Optional)</label>
+                  <input type="datetime-local" id="assignment-due-date" name="due_date">
+                </div>
+                
+                <div class="form-group">
+                  <label for="assignment-max-submissions">Max Submissions</label>
+                  <input type="number" id="assignment-max-submissions" name="max_submissions" value="3" min="1">
+                </div>
+                
+                <div class="form-actions">
+                  <button type="submit" class="btn-primary">Create Assignment</button>
+                  <button type="button" id="cancel-assignment-btn" class="btn-secondary">Cancel</button>
+                </div>
+                
+                <p id="assignment-message" class="message" aria-live="polite"></p>
+              </form>
+            </div>
+            
+            <div id="assignments-list" class="assignments-list">
+              <h3>Existing Assignments</h3>
+              <div id="assignments-list-content">
+                <p>Loading assignments...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
